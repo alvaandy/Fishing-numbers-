@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>數的順序 </title>
+<style>
+  body { font-family: Arial; text-align:center; background:#87CEEB; margin:0; overflow:hidden; }
+  h1 { margin-top:10px; }
+  #settings { margin:10px auto; padding:10px; background:#e0f7fa; width:95%; max-width:450px; border-radius:10px; }
+  #settings input { width:50px; }
+  #timer { font-size:20px; font-weight:bold; color:darkred; margin:5px 0; }
+  #timebar { width:80%; height:15px; background:#ffe5e5; margin:5px auto 15px; border-radius:8px; overflow:hidden; }
+  #bar { height:100%; width:100%; background:#ff4d4d; transition:width 0.1s linear; }
+  #pond { position: relative; width:100%; height:55vh; background:#1E90FF; overflow:hidden; border:3px solid #004080; border-radius:10px; }
+  .fish { position:absolute; width:60px; height:40px; background:green; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:bold; color:white; cursor:pointer; transition:transform 0.5s ease, top 0.5s ease, left 0.5s ease; }
+  .caught { transform:translateY(-200px) rotate(-20deg); opacity:0.7; }
+  #message { font-size:24px; font-weight:bold; margin-top:10px; color:darkgreen; }
+  button { padding:5px 10px; font-size:16px; margin-left:10px; cursor:pointer; }
+</style>
+</head>
+<body>
+<h1>數的順序</h1>
+
+<div id="settings">
+  <label>起始數字: <input type="number" id="startNumberInput" value="1" min="1" max="50"></label>
+  <label>數字上限: <input type="number" id="maxNumberInput" value="10" min="1" max="50"></label>
+  <label>倒數秒數: <input type="number" id="timeInput" value="15" min="1" max="60"></label>
+  <button id="startBtn">開始遊戲</button>
+</div>
+
+<div id="timer">時間: 15 秒</div>
+<div id="timebar"><div id="bar"></div></div>
+<div id="pond"></div>
+<div id="message"></div>
+
+<audio id="correctSound"><source src="https://www.soundjay.com/button/sounds/button-3.mp3" type="audio/mpeg"></audio>
+<audio id="wrongSound"><source src="https://www.soundjay.com/button/sounds/button-10.mp3" type="audio/mpeg"></audio>
+
+<script>
+let startNumber = 1;
+let maxNumber = 10;
+let timePerFish = 15;
+
+const pond = document.getElementById('pond');
+const timerEl = document.getElementById('timer');
+const barEl = document.getElementById('bar');
+const message = document.getElementById('message');
+const correctSound = document.getElementById('correctSound');
+const wrongSound = document.getElementById('wrongSound');
+
+const startNumberInput = document.getElementById('startNumberInput');
+const maxNumberInput = document.getElementById('maxNumberInput');
+const timeInput = document.getElementById('timeInput');
+const startBtn = document.getElementById('startBtn');
+
+let nextNumber = 1;
+let timeLeft = timePerFish;
+let timerInterval;
+
+// 檢查是否重疊
+function isOverlapping(x, y, positions, width = 60, height = 40){
+  for(const pos of positions){
+    if(x < pos.x + width && x + width > pos.x && y < pos.y + height && y + height > pos.y){
+      return true;
+    }
+  }
+  return false;
+}
+
+// 生成魚（固定位置且不重疊）
+function generateFish(){
+  pond.innerHTML = '';
+  let numbers = Array.from({length: maxNumber - startNumber + 1}, (_,i) => startNumber + i);
+  numbers.sort(() => Math.random() - 0.5);
+  const positions = [];
+
+  numbers.forEach(num => {
+    let x, y;
+    let attempts = 0;
+    do {
+      x = Math.random() * (pond.clientWidth - 70);
+      y = Math.random() * (pond.clientHeight - 50);
+      attempts++;
+    } while(isOverlapping(x, y, positions) && attempts < 100); // 避免重疊
+    positions.push({x, y});
+
+    const fish = document.createElement('div');
+    fish.classList.add('fish');
+    fish.textContent = num;
+    fish.style.left = x + 'px';
+    fish.style.top = y + 'px';
+    fish.addEventListener('click', ()=>catchFish(fish,num));
+    pond.appendChild(fish);
+  });
+}
+
+// 更新計時器
+function updateTimerDisplay(){
+  timerEl.textContent = `時間: ${Math.ceil(timeLeft)} 秒`;
+  barEl.style.width = `${(timeLeft/timePerFish)*100}%`;
+}
+
+// 開始倒數計時
+function startTimer(){
+  clearInterval(timerInterval);
+  timeLeft = timePerFish;
+  updateTimerDisplay();
+  timerInterval = setInterval(()=>{
+    timeLeft -= 0.1;
+    if(timeLeft <= 0){
+      clearInterval(timerInterval);
+      alert(`⏰ 時間到！請重新釣 ${nextNumber}`);
+      timeLeft = timePerFish;
+      updateTimerDisplay();
+      startTimer();
+    } else {
+      updateTimerDisplay();
+    }
+  },100);
+}
+
+// 點擊魚事件
+function catchFish(fish,num){
+  if(num === nextNumber){
+    fish.classList.add('caught');
+    setTimeout(()=>{fish.remove()},500);
+    nextNumber++;
+    correctSound.currentTime=0;
+    correctSound.play();
+    timeLeft = timePerFish;
+    updateTimerDisplay();
+    if(nextNumber > maxNumber){
+      clearInterval(timerInterval);
+      message.textContent = `🎉 恭喜完成 ${startNumber}～${maxNumber}！`;
+    }
+  } else {
+    wrongSound.currentTime=0;
+    wrongSound.play();
+    alert(`順序錯了！請先釣 ${nextNumber}`);
+  }
+}
+
+// 初始化遊戲
+function startGame(){
+  startNumber = parseInt(startNumberInput.value) || 1;
+  maxNumber = parseInt(maxNumberInput.value) || 10;
+  timePerFish = parseInt(timeInput.value) || 15;
+  nextNumber = startNumber;
+  message.textContent = '';
+  generateFish();
+  startTimer();
+}
+
+// 綁定開始按鈕
+startBtn.addEventListener('click', startGame);
+
+// 預設啟動
+startGame();
+</script>
+</body>
+</html>
